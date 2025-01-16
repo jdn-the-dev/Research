@@ -1,0 +1,11 @@
+D:\total.dev\YouTube\Research\Security\Obfuscation\target\debug\deps\libgetrandom-037390596dff7a9e.rmeta: C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\lib.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\util.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error_impls.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\windows.rs
+
+D:\total.dev\YouTube\Research\Security\Obfuscation\target\debug\deps\libgetrandom-037390596dff7a9e.rlib: C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\lib.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\util.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error_impls.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\windows.rs
+
+D:\total.dev\YouTube\Research\Security\Obfuscation\target\debug\deps\getrandom-037390596dff7a9e.d: C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\lib.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\util.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error_impls.rs C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\windows.rs
+
+C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\lib.rs:
+C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error.rs:
+C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\util.rs:
+C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\error_impls.rs:
+C:\Users\jaydo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\getrandom-0.2.15\src\windows.rs:
