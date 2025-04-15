@@ -45,18 +45,13 @@ def verify_hashes(directory1, directory2, secret_key="my_secret_key"):
             print(f"{filename}: Hash file or original file missing")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: python program.py <mode> <directory1> <directory2>")
-        print("Mode: generate or verify")
+    if len(sys.argv) != 3:
+        print("Usage: python program1.py <directory1> <directory2>")
+        print("Mode: generate")
         sys.exit(1)
 
-    mode = sys.argv[1].lower()
-    directory1 = sys.argv[2]
-    directory2 = sys.argv[3]
+    directory1 = sys.argv[1]
+    directory2 = sys.argv[2]
 
-    if mode == "generate":
-        generate_hashes(directory1, directory2)
-    elif mode == "verify":
-        verify_hashes(directory1, directory2)
-    else:
-        print("Invalid mode. Use 'generate' or 'verify'.")
+    generate_hashes(directory1, directory2)
+
