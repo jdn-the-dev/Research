@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         ])
         self.spot_table.setSortingEnabled(True)
         self.spot_table.setAlternatingRowColors(True)
-        font = QFont("Courier", 10)
+        font = QFont("Arial", 10)
         self.spot_table.setFont(font)
         header = self.spot_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
         log_layout = QVBoxLayout(self.log_tab)
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setFont(QFont("Courier", 9))
+        self.log_view.setFont(QFont("Arial", 9))
         log_layout.addWidget(self.log_view)
         self.tabs.addTab(self.log_tab, "Log")
 
@@ -175,113 +175,112 @@ class MainWindow(QMainWindow):
     def on_fut_finished(self):
         self.fut_status_label.setText(f"Status: Last futures update at {time.strftime('%H:%M:%S')}")
 
+    def _make_item(self, text, numeric=False):
+        """Always create a QTableWidgetItem(str(text)), center it, and
+        optionally set its DisplayRole for sorting."""
+        item = QTableWidgetItem(str(text))
+        item.setTextAlignment(Qt.AlignCenter)
+        item.setFont(QFont("Courier", 12))
+        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        if numeric:
+            # strip commas and trailing % if present
+            txt = str(text).replace(",", "").rstrip("%")
+            try:
+                val = float(txt)
+                item.setData(Qt.DisplayRole, val)
+            except:
+                pass
+        return item
     def populate_spot_table(self, rows):
+        """rows: list of 8-tuples
+           (symbol, init_s, prev_s, now_s, vol_s, price_s, prev_high, prev_low)"""
         self.spot_table.setRowCount(len(rows))
-        for idx, (symbol, init_s, prev_s, now_s, vol_s, price_s, prev_high, prev_low) in enumerate(rows):
-            items = []
-            # existing 6 columns
-            for col, text in enumerate((symbol, init_s, prev_s, now_s, vol_s, price_s)):
-                item = QTableWidgetItem(text)
-                item.setTextAlignment(Qt.AlignCenter)
-                item.setFont(QFont("Courier", 12))
-                item.setFlags(item.flags() ^ Qt.ItemIsEditable)
-                # sorting roles
-                if col in (1, 2, 3):
-                    try: item.setData(Qt.DisplayRole, float(text.strip("%")))
-                    except: pass
-                elif col in (4, 5):
-                    try: item.setData(Qt.DisplayRole, float(text.replace(",", "")))
-                    except: pass
-                items.append(item)
+        for row_idx, row in enumerate(rows):
+            symbol, init_s, prev_s, now_s, vol_s, price_s, ph, pl = row
 
-            # Prev Day Range column
-            range_text = f"{prev_high:.2f}-{prev_low:.2f}"
-            range_item = QTableWidgetItem(range_text)
-            range_item.setTextAlignment(Qt.AlignCenter)
-            range_item.setFont(QFont("Courier", 12))
-            range_item.setFlags(range_item.flags() ^ Qt.ItemIsEditable)
-            items.append(range_item)
+            # build each of the 7 cells
+            items = [
+                self._make_item(symbol),
+                self._make_item(init_s,  numeric=True),
+                self._make_item(prev_s,  numeric=True),
+                self._make_item(now_s,   numeric=True),
+                self._make_item(vol_s,   numeric=True),
+                self._make_item(price_s, numeric=True),
+                self._make_item(f"{ph:.2f}-{pl:.2f}")
+            ]
 
-            # determine background color
+            # coloring logic
             color = None
             try:
-                prev_pct  = float(prev_s.strip("%"))
-                now_pct   = float(now_s.strip("%"))
-                price_val = float(price_s)
-            except ValueError:
-                pass
+                prev_pct  = float(prev_s.rstrip("%"))
+                now_pct   = float(now_s.rstrip("%"))
+                price_val = float(str(price_s).replace(",", ""))
+            except:
+                color = None
             else:
-                if prev_pct == float(init_s.strip("%")):
+                if prev_pct == float(init_s.rstrip("%")):
                     color = NEW_COLOR
                 elif now_pct > 0:
                     color = POS_COLOR
                 elif now_pct < 0:
                     color = NEG_COLOR
 
-                # override if price outside prev_high/prev_low
-                if price_val > prev_high or price_val < prev_low:
+                # override if price is outside yesterday’s range
+                if price_val > ph or price_val < pl:
                     color = RANGE_BREAK_COLOR
 
             if color:
-                for item in items:
-                    item.setBackground(color)
+                for it in items:
+                    it.setBackground(color)
 
-            for col, item in enumerate(items):
-                self.spot_table.setItem(idx, col, item)
+            # finally shove them into the table
+            for col, it in enumerate(items):
+                self.spot_table.setItem(row_idx, col, it)
 
         self.spot_table.resizeRowsToContents()
 
     def populate_fut_table(self, rows):
+        """same shape as spot, but for futures"""
         self.fut_table.setRowCount(len(rows))
-        for idx, (symbol, init_s, prev_s, now_s, vol_s, price_s, prev_high, prev_low) in enumerate(rows):
-            items = []
-            for col, text in enumerate((symbol, init_s, prev_s, now_s, vol_s, price_s)):
-                item = QTableWidgetItem(text)
-                item.setTextAlignment(Qt.AlignCenter)
-                item.setFont(QFont("Courier", 12))
-                item.setFlags(item.flags() ^ Qt.ItemIsEditable)
-                if col in (1, 2, 3):
-                    try: item.setData(Qt.DisplayRole, float(text.strip("%")))
-                    except: pass
-                elif col in (4, 5):
-                    try: item.setData(Qt.DisplayRole, float(text.replace(",", "")))
-                    except: pass
-                items.append(item)
+        for row_idx, row in enumerate(rows):
+            symbol, init_s, prev_s, now_s, vol_s, price_s, ph, pl = row
 
-            range_text = f"{prev_high:.2f}-{prev_low:.2f}"
-            range_item = QTableWidgetItem(range_text)
-            range_item.setTextAlignment(Qt.AlignCenter)
-            range_item.setFont(QFont("Courier", 12))
-            range_item.setFlags(range_item.flags() ^ Qt.ItemIsEditable)
-            items.append(range_item)
+            items = [
+                self._make_item(symbol),
+                self._make_item(init_s,  numeric=True),
+                self._make_item(prev_s,  numeric=True),
+                self._make_item(now_s,   numeric=True),
+                self._make_item(vol_s,   numeric=True),
+                self._make_item(price_s, numeric=True),
+                self._make_item(f"{ph:.2f}-{pl:.2f}")
+            ]
 
             color = None
             try:
-                prev_pct  = float(prev_s.strip("%"))
-                now_pct   = float(now_s.strip("%"))
-                price_val = float(price_s)
-            except ValueError:
-                pass
+                prev_pct  = float(prev_s.rstrip("%"))
+                now_pct   = float(now_s.rstrip("%"))
+                price_val = float(str(price_s).replace(",", ""))
+            except:
+                color = None
             else:
-                if prev_pct == float(init_s.strip("%")):
+                if prev_pct == float(init_s.rstrip("%")):
                     color = NEW_COLOR
                 elif now_pct > 0:
                     color = POS_COLOR
                 elif now_pct < 0:
                     color = NEG_COLOR
 
-                if price_val > prev_high or price_val < prev_low:
+                if price_val > ph or price_val < pl:
                     color = RANGE_BREAK_COLOR
 
             if color:
-                for item in items:
-                    item.setBackground(color)
+                for it in items:
+                    it.setBackground(color)
 
-            for col, item in enumerate(items):
-                self.fut_table.setItem(idx, col, item)
+            for col, it in enumerate(items):
+                self.fut_table.setItem(row_idx, col, it)
 
         self.fut_table.resizeRowsToContents()
-
 
 def main():
     app = QApplication(sys.argv)
