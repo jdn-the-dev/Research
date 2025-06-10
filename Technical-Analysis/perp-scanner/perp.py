@@ -187,11 +187,24 @@ class MainWindow(QMainWindow):
         self.spot_table.setRowCount(len(rows))
         for idx, (symbol, init_s, prev_s, now_s, vol_s, price_s) in enumerate(rows):
             items = []
-            for text in (symbol, init_s, prev_s, now_s, vol_s, price_s):
-                item = QTableWidgetItem(text)
+            for col, text in enumerate((symbol, init_s, prev_s, now_s, vol_s, price_s)):
+                item = QTableWidgetItem()
                 item.setTextAlignment(Qt.AlignCenter)
-                item.setFont(QFont("Arial", 9))
+                item.setFont(QFont("Courier", 12))
                 item.setFlags(item.flags() ^ Qt.ItemIsEditable)
+                # Set display text
+                item.setText(text)
+                # For numeric columns, set DisplayRole to float for sorting
+                if col in (1, 2, 3):  # percent columns
+                    try:
+                        item.setData(Qt.DisplayRole, float(text.strip("%")))
+                    except Exception:
+                        pass
+                elif col in (4, 5):  # volume and price columns
+                    try:
+                        item.setData(Qt.DisplayRole, float(text.replace(",", "")))
+                    except Exception:
+                        pass
                 items.append(item)
 
             color = None
@@ -223,11 +236,24 @@ class MainWindow(QMainWindow):
         self.fut_table.setRowCount(len(rows))
         for idx, (symbol, init_s, prev_s, now_s, vol_s, price_s) in enumerate(rows):
             items = []
-            for text in (symbol, init_s, prev_s, now_s, vol_s, price_s):
-                item = QTableWidgetItem(text)
+            for col, text in enumerate((symbol, init_s, prev_s, now_s, vol_s, price_s)):
+                item = QTableWidgetItem()
                 item.setTextAlignment(Qt.AlignCenter)
-                item.setFont(QFont("Arial", 9))
+                item.setFont(QFont("Courier", 12))
                 item.setFlags(item.flags() ^ Qt.ItemIsEditable)
+                # Set display text
+                item.setText(text)
+                # For numeric columns, set DisplayRole to float for sorting
+                if col in (1, 2, 3):  # percent columns
+                    try:
+                        item.setData(Qt.DisplayRole, float(text.strip("%")))
+                    except Exception:
+                        pass
+                elif col in (4, 5):  # volume and price columns
+                    try:
+                        item.setData(Qt.DisplayRole, float(text.replace(",", "")))
+                    except Exception:
+                        pass
                 items.append(item)
 
             color = None
