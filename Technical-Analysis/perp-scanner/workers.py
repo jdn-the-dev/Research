@@ -4,6 +4,9 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from plyer import notification
 
+# Global flag to disable desktop notifications
+MUTE_NOTIFICATIONS = False
+
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 SPOT_API_BASE       = "https://api.kraken.com/0/public"
 FUTURES_API_BASE    = "https://futures.kraken.com/derivatives/api/v3"
@@ -127,11 +130,12 @@ class SpotWorker(QObject):
                         vol_str    = f"{vol*price:,.1f}"
                         price_str  = f"{price:.2f}"
                         table_rows.append((symbol, init_str, prev_str, now_str, vol_str, price_str, prev_high, prev_low))
-                        notification.notify(
-                            title="New Spot Alert",
-                            message=f"{symbol} changed by {new_pct:.2f}% with volume ${vol*price:,.1f}",
-                            timeout=5
-                        )
+                        if not MUTE_NOTIFICATIONS:
+                            notification.notify(
+                                title="New Spot Alert",
+                                message=f"{symbol} changed by {new_pct:.2f}% with volume ${vol*price:,.1f}",
+                                timeout=5
+                            )
                         self.log_message.emit(f"Spot coin added: {symbol} at {new_pct:.2f}%")
                 else:
                     initial = record['initial']
@@ -262,11 +266,12 @@ class FuturesWorker(QObject):
                     vol_str    = f"{vol*price:,.1f}"
                     price_str  = f"{price:.2f}"
                     table_rows.append((symbol, init_str, prev_str, now_str, vol_str, price_str, prev_high, prev_low))
-                    notification.notify(
-                        title="New Futures Alert",
-                        message=f"{symbol} at {new_pct:.2f}% (Vol: ${vol*price:,.1f})",
-                        timeout=5,
-                    )
+                    if not MUTE_NOTIFICATIONS:
+                        notification.notify(
+                            title="New Futures Alert",
+                            message=f"{symbol} at {new_pct:.2f}% (Vol: ${vol*price:,.1f})",
+                            timeout=5,
+                        )
                     self.log_message.emit(f"Futures added: {symbol} at {new_pct:.2f}%")
                 else:
                     initial = record['initial']
