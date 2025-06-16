@@ -1,5 +1,6 @@
 import sys
 import time
+import workers
 from workers import SpotWorker, FuturesWorker
 
 from PyQt5.QtCore import QThread, Qt
@@ -40,6 +41,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         main_layout = QVBoxLayout()
         central.setLayout(main_layout)
+
+        # Button to mute/unmute system notifications
+        self.mute_button = QPushButton("Mute Notifications")
+        self.mute_button.setCheckable(True)
+        self.mute_button.toggled.connect(self.toggle_mute)
+        main_layout.addWidget(self.mute_button)
 
         # Tabs
         self.tabs = QTabWidget()
@@ -162,6 +169,15 @@ class MainWindow(QMainWindow):
         SCAN_INTERVAL_SEC = self.fut_interval_spin.value()
         self.log(f"Futures interval changed to {SCAN_INTERVAL_SEC} seconds")
         self.fut_status_label.setText(f"Status: Interval set to {SCAN_INTERVAL_SEC}s")
+
+    def toggle_mute(self, checked: bool):
+        workers.MUTE_NOTIFICATIONS = checked
+        if checked:
+            self.mute_button.setText("Unmute Notifications")
+            self.log("Notifications muted")
+        else:
+            self.mute_button.setText("Mute Notifications")
+            self.log("Notifications unmuted")
 
     def on_spot_started(self):
         self.spot_status_label.setText("Status: Loading...")
