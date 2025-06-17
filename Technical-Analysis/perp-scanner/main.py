@@ -4,7 +4,7 @@ import workers
 from workers import SpotWorker, FuturesWorker
 
 from PyQt5.QtCore import QThread, Qt, QSize
-from PyQt5.QtGui import QColor, QFont
+from PyQt5.QtGui import QColor, QFont, QCursor
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -199,18 +199,16 @@ class MainWindow(QMainWindow):
         self.fut_status_label.setText(f"Status: Last futures update at {time.strftime('%H:%M:%S')}")
 
     def show_rsi_popup(self, row: int, column: int, is_future: bool):
-        # Decide which table and grab the token symbol
+        # Replace self.setOverrideCursor with QApplication.setOverrideCursor
+        QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
         table = self.fut_table if is_future else self.spot_table
         token_item = table.item(row, 0)
         token = token_item.text().replace(':', '/') if token_item else "Unknown"
         self.log(f"Fetching RSI for {token}…")
-
-        # Fetch RSI data off the main thread
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(fetch_rsi_intervals, token)
             rsis = future.result()
-
-        # Ensure we never format a None
+        QApplication.restoreOverrideCursor()  # Restore cursor after fetching RSI
         r1 = rsis.get('1h') or float('nan')
         r4 = rsis.get('4h') or float('nan')
         rD = rsis.get('1d') or float('nan')

@@ -127,6 +127,8 @@ class SpotWorker(QObject):
                         vol_str    = f"{vol*price:,.1f}"
                         price_str  = f"{price:.2f}"
                         table_rows.append((symbol, init_str, prev_str, now_str, vol_str, price_str, prev_high, prev_low))
+                        table_rows.sort(key=lambda row: (float(row[4].replace(',', '')), row[0]), reverse=True)
+
                         if not MUTE_NOTIFICATIONS:
                             notification.notify(
                                 title="New Spot Alert",
@@ -155,6 +157,7 @@ class SpotWorker(QObject):
                     vol_str    = f"{vol*price:,.1f}"
                     price_str  = f"{price:.2f}"
                     table_rows.append((symbol, init_str, prev_str, now_str, vol_str, price_str, prev_high, prev_low))
+                    table_rows.sort(key=lambda row: (float(row[4].replace(',', '')), row[0]), reverse=True)
 
             # cleanup dropped
             for symbol in list(spot_alerted_map.keys()):
@@ -263,6 +266,7 @@ class FuturesWorker(QObject):
                     vol_str    = f"{vol*price:,.1f}"
                     price_str  = f"{price:.2f}"
                     table_rows.append((symbol, init_str, prev_str, now_str, vol_str, price_str, prev_high, prev_low))
+                    table_rows.sort(key=lambda row: (float(row[4].replace(',', '')), row[0]), reverse=True)
                     if not MUTE_NOTIFICATIONS:
                         notification.notify(
                             title="New Futures Alert",
@@ -289,6 +293,7 @@ class FuturesWorker(QObject):
                     vol_str    = f"{vol*price:,.1f}"
                     price_str  = f"{price:.2f}"
                     table_rows.append((symbol, init_str, prev_str, now_str, vol_str, price_str, prev_high, prev_low))
+                    table_rows.sort(key=lambda row: (float(row[4].replace(',', '')), row[0]), reverse=True)
 
             for symbol in list(fut_alerted_map.keys()):
                 if symbol not in current_map:
