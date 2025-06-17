@@ -1,8 +1,9 @@
 import sys
 import time
+import workers
 from workers import SpotWorker, FuturesWorker
 
-from PyQt5.QtCore import QThread, Qt
+from PyQt5.QtCore import QThread, Qt, QSize
 from PyQt5.QtGui import QColor, QFont
 from PyQt5.QtWidgets import (
     QApplication,
@@ -14,6 +15,8 @@ from PyQt5.QtWidgets import (
     QWidget,
     QLabel,
     QSpinBox,
+    QToolButton,      
+    QStyle,           
     QPushButton,
     QHeaderView,
     QTabWidget,
@@ -27,19 +30,31 @@ SCAN_INTERVAL_SEC   = 60  # default scan interval (seconds)
 NEW_COLOR           = QColor(173, 216, 230)  # light blue
 POS_COLOR           = QColor(144, 238, 144)  # light green
 NEG_COLOR           = QColor(250, 128, 114)  # light red
-RANGE_BREAK_COLOR   = QColor( 142, 68, 191 )  # light purple
+RANGE_BREAK_COLOR   = QColor(142, 68, 191)   # light purple
 
-# ─── MAIN WINDOW ───────────────────────────────────────────────────────────────
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Kraken USD Alerts")
         self.resize(920, 600)
 
+        # ─── Top Controls (minimal bar) ────────────────────────────────────
         central = QWidget()
         self.setCentralWidget(central)
-        main_layout = QVBoxLayout()
-        central.setLayout(main_layout)
+        main_layout = QVBoxLayout(central)
+
+        controls_layout = QHBoxLayout()
+        controls_layout.addStretch()
+        self.mute_button = QToolButton()
+        self.mute_button.setIcon(self.style().standardIcon(QStyle.SP_MediaVolumeMuted))
+        self.mute_button.setIconSize(QSize(24, 24))
+        self.mute_button.setCheckable(True)
+        self.mute_button.setChecked(True)  # Set the button to the muted state
+        self.mute_button.setAutoRaise(True)
+        self.mute_button.toggled.connect(self.toggle_mute)
+        workers.MUTE_NOTIFICATIONS = True  # Ensure notifications are muted at startup
+        controls_layout.addWidget(self.mute_button)
+        main_layout.addLayout(controls_layout)
 
         # Tabs
         self.tabs = QTabWidget()
@@ -49,7 +64,6 @@ class MainWindow(QMainWindow):
         self.spot_tab = QWidget()
         spot_layout = QVBoxLayout(self.spot_tab)
 
-        # Interval control + status for spot
         spot_interval_layout = QHBoxLayout()
         spot_interval_layout.addWidget(QLabel("Spot Scan Interval (s):"))
         self.spot_interval_spin = QSpinBox()
@@ -64,7 +78,6 @@ class MainWindow(QMainWindow):
         spot_interval_layout.addWidget(self.spot_status_label)
         spot_layout.addLayout(spot_interval_layout)
 
-        # Spot table
         self.spot_table = QTableWidget()
         self.spot_table.setColumnCount(7)
         self.spot_table.setHorizontalHeaderLabels([
@@ -85,7 +98,6 @@ class MainWindow(QMainWindow):
         self.fut_tab = QWidget()
         fut_layout = QVBoxLayout(self.fut_tab)
 
-        # Interval control + status for futures
         fut_interval_layout = QHBoxLayout()
         fut_interval_layout.addWidget(QLabel("Futures Scan Interval (s):"))
         self.fut_interval_spin = QSpinBox()
@@ -100,7 +112,6 @@ class MainWindow(QMainWindow):
         fut_interval_layout.addWidget(self.fut_status_label)
         fut_layout.addLayout(fut_interval_layout)
 
-        # Futures table
         self.fut_table = QTableWidget()
         self.fut_table.setColumnCount(7)
         self.fut_table.setHorizontalHeaderLabels([
@@ -125,7 +136,7 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.log_view)
         self.tabs.addTab(self.log_tab, "Log")
 
-        # Start SpotWorker thread
+        # Start workers
         self.spot_worker = SpotWorker()
         self.spot_thread = QThread()
         self.spot_worker.moveToThread(self.spot_thread)
@@ -136,7 +147,6 @@ class MainWindow(QMainWindow):
         self.spot_thread.started.connect(self.spot_worker.run)
         self.spot_thread.start()
 
-        # Start FuturesWorker thread
         self.fut_worker = FuturesWorker()
         self.fut_thread = QThread()
         self.fut_worker.moveToThread(self.fut_thread)
@@ -163,6 +173,19 @@ class MainWindow(QMainWindow):
         self.log(f"Futures interval changed to {SCAN_INTERVAL_SEC} seconds")
         self.fut_status_label.setText(f"Status: Interval set to {SCAN_INTERVAL_SEC}s")
 
+    def toggle_mute(self, checked: bool):
+        is_muted = workers.MUTE_NOTIFICATIONS
+        if is_muted:
+            self.mute_button.setIcon(self.style().standardIcon(QStyle.SP_MediaVolume))
+            self.mute_button.setText("Unmute Notifications")
+            self.log("Notifications unmuted")
+        else:
+            self.mute_button.setIcon(self.style().standardIcon(QStyle.SP_MediaVolumeMuted))
+            self.mute_button.setText("Mute Notifications")
+            self.log("Notifications muted")
+
+        workers.MUTE_NOTIFICATIONS = checked
+
     def on_spot_started(self):
         self.spot_status_label.setText("Status: Loading...")
 
@@ -176,29 +199,29 @@ class MainWindow(QMainWindow):
         self.fut_status_label.setText(f"Status: Last futures update at {time.strftime('%H:%M:%S')}")
 
     def _make_item(self, text, numeric=False):
-        """Always create a QTableWidgetItem(str(text)), center it, and
-        optionally set its DisplayRole for sorting."""
         item = QTableWidgetItem(str(text))
         item.setTextAlignment(Qt.AlignCenter)
         item.setFont(QFont("Courier", 12))
         item.setFlags(item.flags() & ~Qt.ItemIsEditable)
         if numeric:
-            # strip commas and trailing % if present
             txt = str(text).replace(",", "").rstrip("%")
             try:
-                val = float(txt)
-                item.setData(Qt.DisplayRole, val)
+                item.setData(Qt.DisplayRole, float(txt))
             except:
                 pass
         return item
-    def populate_spot_table(self, rows):
-        """rows: list of 8-tuples
-           (symbol, init_s, prev_s, now_s, vol_s, price_s, prev_high, prev_low)"""
-        self.spot_table.setRowCount(len(rows))
-        for row_idx, row in enumerate(rows):
-            symbol, init_s, prev_s, now_s, vol_s, price_s, ph, pl = row
 
-            # build each of the 7 cells
+    def populate_spot_table(self, rows):
+        # dedupe by symbol (keep first seen)
+        unique = {}
+        for r in rows:
+            sym = r[0]
+            if sym not in unique:
+                unique[sym] = r
+        deduped = list(unique.values())
+
+        self.spot_table.setRowCount(len(deduped))
+        for row_idx, (symbol, init_s, prev_s, now_s, vol_s, price_s, ph, pl) in enumerate(deduped):
             items = [
                 self._make_item(symbol),
                 self._make_item(init_s,  numeric=True),
@@ -209,14 +232,13 @@ class MainWindow(QMainWindow):
                 self._make_item(f"{ph:.2f}-{pl:.2f}")
             ]
 
-            # coloring logic
             color = None
             try:
                 prev_pct  = float(prev_s.rstrip("%"))
                 now_pct   = float(now_s.rstrip("%"))
                 price_val = float(str(price_s).replace(",", ""))
             except:
-                color = None
+                pass
             else:
                 if prev_pct == float(init_s.rstrip("%")):
                     color = NEW_COLOR
@@ -224,8 +246,6 @@ class MainWindow(QMainWindow):
                     color = POS_COLOR
                 elif now_pct < 0:
                     color = NEG_COLOR
-
-                # override if price is outside yesterday’s range
                 if price_val > ph or price_val < pl:
                     color = RANGE_BREAK_COLOR
 
@@ -233,18 +253,21 @@ class MainWindow(QMainWindow):
                 for it in items:
                     it.setBackground(color)
 
-            # finally shove them into the table
             for col, it in enumerate(items):
                 self.spot_table.setItem(row_idx, col, it)
 
         self.spot_table.resizeRowsToContents()
 
     def populate_fut_table(self, rows):
-        """same shape as spot, but for futures"""
-        self.fut_table.setRowCount(len(rows))
-        for row_idx, row in enumerate(rows):
-            symbol, init_s, prev_s, now_s, vol_s, price_s, ph, pl = row
+        unique = {}
+        for r in rows:
+            sym = r[0]
+            if sym not in unique:
+                unique[sym] = r
+        deduped = list(unique.values())
 
+        self.fut_table.setRowCount(len(deduped))
+        for row_idx, (symbol, init_s, prev_s, now_s, vol_s, price_s, ph, pl) in enumerate(deduped):
             items = [
                 self._make_item(symbol),
                 self._make_item(init_s,  numeric=True),
@@ -261,7 +284,7 @@ class MainWindow(QMainWindow):
                 now_pct   = float(now_s.rstrip("%"))
                 price_val = float(str(price_s).replace(",", ""))
             except:
-                color = None
+                pass
             else:
                 if prev_pct == float(init_s.rstrip("%")):
                     color = NEW_COLOR
@@ -269,7 +292,6 @@ class MainWindow(QMainWindow):
                     color = POS_COLOR
                 elif now_pct < 0:
                     color = NEG_COLOR
-
                 if price_val > ph or price_val < pl:
                     color = RANGE_BREAK_COLOR
 
@@ -281,6 +303,7 @@ class MainWindow(QMainWindow):
                 self.fut_table.setItem(row_idx, col, it)
 
         self.fut_table.resizeRowsToContents()
+
 
 def main():
     app = QApplication(sys.argv)
