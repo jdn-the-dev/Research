@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         self.mute_button = QToolButton()
         self.mute_button.setIcon(self.style().standardIcon(QStyle.SP_MediaVolumeMuted))
         self.mute_button.setCheckable(True)
-        self.mute_button.setChecked(True)
+        self.mute_button.setChecked(False)
         self.mute_button.toggled.connect(self.toggle_mute)
         ctrl.addWidget(self.mute_button)
         workers.MUTE_NOTIFICATIONS = True
@@ -181,10 +181,11 @@ class MainWindow(QMainWindow):
         self.fut_status_label.setText(f"Status: Interval set to {SCAN_INTERVAL_SEC}s")
 
     def toggle_mute(self, checked: bool):
-        workers.MUTE_NOTIFICATIONS = checked
         icon = QStyle.SP_MediaVolume if checked else QStyle.SP_MediaVolumeMuted
         self.mute_button.setIcon(self.style().standardIcon(icon))
         self.log("Notifications unmuted" if checked else "Notifications muted")
+        workers.MUTE_NOTIFICATIONS = not checked
+
 
     def on_spot_started(self):
         self.spot_status_label.setText("Status: Loading...")
