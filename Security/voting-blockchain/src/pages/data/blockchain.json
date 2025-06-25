@@ -1,0 +1,20 @@
+[
+  {
+    "index": 0,
+    "timestamp": "1750894547592",
+    "data": {
+      "isGenesis": true
+    },
+    "previousHash": "0",
+    "hash": "8c86bed1d4548a3801761df7e3eb78d167d215e01a88d7a7912060d7e1ff0f70"
+  },
+  {
+    "index": 1,
+    "timestamp": "1750894551279",
+    "data": {
+      "candidate": "Alice"
+    },
+    "previousHash": "8c86bed1d4548a3801761df7e3eb78d167d215e01a88d7a7912060d7e1ff0f70",
+    "hash": "2029b3bcb45b652fe143195dbb8d9b5a2d222eb4a39eaead3eeb26c822036733"
+  }
+]

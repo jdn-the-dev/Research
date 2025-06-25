@@ -2,7 +2,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
-const DATA_PATH = path.join(process.cwd(), "data");
+const DATA_PATH = path.join(process.cwd(), "src/pages/data");
 const FILE_PATH = path.join(DATA_PATH, "blockchain.json");
 
 export interface BlockData {
