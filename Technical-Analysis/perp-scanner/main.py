@@ -4,7 +4,7 @@ import workers
 from workers import SpotWorker, FuturesWorker
 
 from PyQt5.QtCore import QThread, Qt, QSize
-from PyQt5.QtGui import QColor, QFont, QCursor
+from PyQt5.QtGui import QColor, QFont, QCursor, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import (
 from concurrent.futures import ThreadPoolExecutor
 # Import RSI logic from the indicators package
 from utils.indicators.rsi import fetch_rsi_intervals
+from utils.chart_api import fetch_chart
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 SCAN_INTERVAL_SEC = 60  # default scan interval (seconds)
@@ -216,9 +217,9 @@ class MainWindow(QMainWindow):
 
         # Build dialog
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"RSI for {token}")
+        dialog.setWindowTitle(f"RSI and Charts for {token}")
         dialog.setModal(True)
-        dialog.resize(350, 220)
+        dialog.resize(820, 650)
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(15, 15, 15, 15)
@@ -269,6 +270,26 @@ class MainWindow(QMainWindow):
             grid.addWidget(QLabel(status), i, 2)
 
         main_layout.addLayout(grid)
+
+        # Fetch charts for 1h/4h/1d and display in tabs
+        chart_tabs = QTabWidget()
+        symbol_tv = "KRAKEN:" + token.replace("/", "").replace(":", "")
+        intervals = {"1h": "1h", "4h": "4h", "1d": "1D"}
+        for label, iv in intervals.items():
+            tab = QWidget()
+            v = QVBoxLayout(tab)
+            lbl = QLabel()
+            lbl.setAlignment(Qt.AlignCenter)
+            try:
+                img = fetch_chart(symbol_tv, iv)
+                pix = QPixmap()
+                pix.loadFromData(img)
+                lbl.setPixmap(pix)
+            except Exception as e:
+                lbl.setText(f"Chart load failed: {e}")
+            v.addWidget(lbl)
+            chart_tabs.addTab(tab, label)
+        main_layout.addWidget(chart_tabs)
 
         # OK button
         buttons = QDialogButtonBox(QDialogButtonBox.Ok)
