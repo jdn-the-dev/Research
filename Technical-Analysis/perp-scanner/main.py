@@ -2,9 +2,10 @@ import sys
 import time
 import workers
 from workers import SpotWorker, FuturesWorker
-
+from utils.screenshot.chart_api.get_charts import fetch_chart_bytes
+import os
 from PyQt5.QtCore import QThread, Qt, QSize
-from PyQt5.QtGui import QColor, QFont, QCursor
+from PyQt5.QtGui import QColor, QFont, QCursor,QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -24,7 +25,16 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QDialog,
     QDialogButtonBox,
+    QLineEdit,
+    QCheckBox,
+    QFileDialog,
+
+
 )
+
+import io
+from PIL import Image
+from PIL.ImageQt import toqpixmap
 
 from concurrent.futures import ThreadPoolExecutor
 # Import RSI logic from the indicators package
@@ -44,7 +54,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Kraken USD Alerts")
         self.resize(920, 600)
-
+        self.setWindowFlags(Qt.WindowStaysOnTopHint)
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
@@ -66,8 +76,112 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.tabs)
         self._init_spot_tab()
         self._init_fut_tab()
+        self._init_screenshots_tab()
         self._init_log_tab()
         self._start_workers()
+
+    def _init_screenshots_tab(self):
+        self.screenshots_tab = QWidget()
+        layout = QVBoxLayout(self.screenshots_tab)
+
+        # 1) Pair input + Capture button
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Pair:"))
+        self.pair_input = QLineEdit()
+        self.pair_input.setPlaceholderText("e.g. BTCUSDT")
+        row.addWidget(self.pair_input)
+        btn = QPushButton("Capture")
+        btn.clicked.connect(self.on_capture_clicked)
+        row.addWidget(btn)
+        row.addStretch()
+        layout.addLayout(row)
+
+        # 2) Save-to-folder option
+        save_row = QHBoxLayout()
+        self.save_checkbox = QCheckBox("Save Images")
+        save_row.addWidget(self.save_checkbox)
+        self.save_dir_input = QLineEdit()
+        self.save_dir_input.setPlaceholderText("Output folder (optional)")
+        self.save_dir_input.setReadOnly(True)
+        save_row.addWidget(self.save_dir_input)
+        browse_btn = QPushButton("Browse…")
+        browse_btn.clicked.connect(self.on_browse_folder)
+        save_row.addWidget(browse_btn)
+        save_row.addStretch()
+        layout.addLayout(save_row)
+
+        # 3) Image display
+        self.chart_label = QLabel(alignment=Qt.AlignCenter)
+        self.chart_label.setFixedSize(QSize(800, 400))
+        layout.addWidget(self.chart_label, stretch=1)
+
+        self.tabs.addTab(self.screenshots_tab, "Screenshots")
+
+
+    def on_browse_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select folder", os.getcwd())
+        if folder:
+            self.save_dir_input.setText(folder)
+
+
+    def on_capture_clicked(self):
+        base = self.pair_input.text().strip().upper()
+        if not base:
+            self.log("⚠️ Please enter a pair like BTCUSDT")
+            return
+
+        pair = f"BINANCE:{base}"
+        self.log(f"Capturing charts for {pair}…")
+        QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
+
+        try:
+            intervals = ["1h", "4h", "1D"]
+            first_pix = None
+
+            # prepare output folder if saving
+            out_dir = self.save_dir_input.text() or "charts"
+            if self.save_checkbox.isChecked():
+                os.makedirs(out_dir, exist_ok=True)
+
+            for idx, interval in enumerate(intervals):
+                raw_png = fetch_chart_bytes(pair, interval=interval)
+
+                # display only the 1h chart
+                if idx == 0:
+                    img = Image.open(io.BytesIO(raw_png)).convert("RGBA")
+                    try:
+                        first_pix = toqpixmap(img)
+                    except Exception:
+                        # fallback via temp file
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                            img.save(tmp, format="PNG")
+                            tmp_path = tmp.name
+                        first_pix = QPixmap(tmp_path)
+                        os.unlink(tmp_path)
+
+                # save each interval if requested
+                if self.save_checkbox.isChecked():
+                    fname = f"{pair.replace(':','_')}_{interval}.png"
+                    path = os.path.join(out_dir, fname)
+                    with open(path, "wb") as f:
+                        f.write(raw_png)
+                    self.log(f"Saved {interval} chart: {path}")
+
+            # update UI with the 1h chart
+            if first_pix:
+                self.chart_label.setPixmap(
+                    first_pix.scaled(
+                        self.chart_label.size(),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation
+                    )
+                )
+                self.log(f"Screenshot updated for {pair} (1h)")
+        except Exception as e:
+            self.log(f"Error capturing chart: {e}")
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def _init_spot_tab(self):
         self.spot_tab = QWidget()
@@ -326,7 +440,7 @@ class MainWindow(QMainWindow):
     def _make_item(self, text, numeric=False):
         it = QTableWidgetItem(str(text))
         it.setTextAlignment(Qt.AlignCenter)
-        it.setFont(QFont("Courier", 12))
+        it.setFont(QFont("Courier", 9))
         it.setFlags(it.flags() & ~Qt.ItemIsEditable)
         if numeric:
             try:
