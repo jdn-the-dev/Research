@@ -36,8 +36,8 @@ For an 8-bit search space (256 possibilities), the classical approach requires ~
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/jdn-the-dev/QuantumGroverAttack.git
-cd QuantumGroverAttack
+git clone https://github.com/jdn-the-dev/Research.git
+cd Research/Security/QuantumGroverAttack
 ```
 
 ### 2. Restore Dependencies
@@ -230,8 +230,8 @@ This is a demonstration project for educational purposes.
 
 ```bash
 # Clone the repository
-git clone https://github.com/jdn-the-dev/QuantumGroverAttack.git
-cd QuantumGroverAttack
+git clone https://github.com/jdn-the-dev/Research.git
+cd Research/Security/QuantumGroverAttack
 
 # Restore, build, and run
 dotnet restore
