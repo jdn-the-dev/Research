@@ -4,8 +4,9 @@ import workers
 from workers import SpotWorker, FuturesWorker
 from utils.screenshot.chart_api.get_charts import fetch_chart_bytes
 import os
-from PyQt5.QtCore import QThread, Qt, QSize
-from PyQt5.QtGui import QColor, QFont, QCursor,QPixmap
+from settings import load_settings, save_settings
+from PyQt5.QtCore import QThread, Qt, QSize, QSettings
+from PyQt5.QtGui import QColor, QFont, QCursor, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -28,8 +29,8 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QCheckBox,
     QFileDialog,
-
-
+    QDoubleSpinBox,
+    QFormLayout,
 )
 
 import io
@@ -37,7 +38,6 @@ from PIL import Image
 from PIL.ImageQt import toqpixmap
 
 from concurrent.futures import ThreadPoolExecutor
-# Import RSI logic from the indicators package
 from utils.indicators.rsi import fetch_rsi_intervals
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
@@ -55,6 +55,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Kraken USD Alerts")
         self.resize(920, 600)
         self.setWindowFlags(Qt.WindowStaysOnTopHint)
+
+        # Load persisted Telegram settings
+        self.settings = QSettings("TotalDev", "KrakenUSDAlerts")
+        # Load persisted settings from JSON
+        config = load_settings()
+        self.telegram_token = config.get("telegram_token", "")
+        self.telegram_chat_id = config.get("telegram_chat_id", "")
+        self.alert_threshold = config.get("alert_threshold", 10.0)
+
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
@@ -62,12 +71,21 @@ class MainWindow(QMainWindow):
         # Top controls
         ctrl = QHBoxLayout()
         ctrl.addStretch()
+
+        # Mute button
         self.mute_button = QToolButton()
         self.mute_button.setIcon(self.style().standardIcon(QStyle.SP_MediaVolumeMuted))
         self.mute_button.setCheckable(True)
         self.mute_button.setChecked(False)
         self.mute_button.toggled.connect(self.toggle_mute)
         ctrl.addWidget(self.mute_button)
+
+        # Settings button for Telegram alerts
+        self.settings_button = QToolButton()
+        self.settings_button.setText("Settings")
+        self.settings_button.clicked.connect(self.on_settings_clicked)
+        ctrl.addWidget(self.settings_button)
+
         workers.MUTE_NOTIFICATIONS = True
         main_layout.addLayout(ctrl)
 
@@ -80,23 +98,65 @@ class MainWindow(QMainWindow):
         self._init_log_tab()
         self._start_workers()
 
+    def on_settings_clicked(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Telegram Alert Settings")
+        dialog.setModal(True)
+        form = QFormLayout(dialog)
+
+        token_input = QLineEdit()
+        token_input.setText(self.telegram_token)
+        form.addRow("Bot Token:", token_input)
+
+        chat_input = QLineEdit()
+        chat_input.setText(self.telegram_chat_id)
+        form.addRow("Chat ID:", chat_input)
+
+        threshold_input = QDoubleSpinBox()
+        threshold_input.setRange(0.1, 100.0)
+        threshold_input.setSuffix(" %")
+        threshold_input.setValue(self.alert_threshold)
+        form.addRow("Change Threshold:", threshold_input)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+
+        if dialog.exec_() == QDialog.Accepted:
+            self.telegram_token = token_input.text().strip()
+            self.telegram_chat_id = chat_input.text().strip()
+            self.alert_threshold = threshold_input.value()
+            # Persist to JSON
+            save_settings({
+                "telegram_token": self.telegram_token,
+                "telegram_chat_id": self.telegram_chat_id,
+                "alert_threshold": self.alert_threshold
+            })
+            self.log(f"Telegram settings updated (threshold: {self.alert_threshold}%)")
+
     def _init_screenshots_tab(self):
         self.screenshots_tab = QWidget()
         layout = QVBoxLayout(self.screenshots_tab)
 
-        # 1) Pair input + Capture button
         row = QHBoxLayout()
         row.addWidget(QLabel("Pair:"))
         self.pair_input = QLineEdit()
         self.pair_input.setPlaceholderText("e.g. BTCUSDT")
         row.addWidget(self.pair_input)
+
         btn = QPushButton("Capture")
         btn.clicked.connect(self.on_capture_clicked)
         row.addWidget(btn)
         row.addStretch()
         layout.addLayout(row)
 
-        # 2) Save-to-folder option
+        status_row = QHBoxLayout()
+        self.status_label = QLabel("Status: Idle")
+        status_row.addWidget(self.status_label)
+        status_row.addStretch()
+        layout.addLayout(status_row)
+
         save_row = QHBoxLayout()
         self.save_checkbox = QCheckBox("Save Images")
         save_row.addWidget(self.save_checkbox)
@@ -110,65 +170,59 @@ class MainWindow(QMainWindow):
         save_row.addStretch()
         layout.addLayout(save_row)
 
-        # 3) Image display
         self.chart_label = QLabel(alignment=Qt.AlignCenter)
         self.chart_label.setFixedSize(QSize(800, 400))
         layout.addWidget(self.chart_label, stretch=1)
 
         self.tabs.addTab(self.screenshots_tab, "Screenshots")
 
-
     def on_browse_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select folder", os.getcwd())
         if folder:
             self.save_dir_input.setText(folder)
 
-
     def on_capture_clicked(self):
         base = self.pair_input.text().strip().upper()
         if not base:
+            self.status_label.setText("Status: Please enter a valid pair")
             self.log("⚠️ Please enter a pair like BTCUSDT")
             return
 
         pair = f"BINANCE:{base}"
+        self.status_label.setText(f"Status: Capturing charts for {pair}…")
         self.log(f"Capturing charts for {pair}…")
+        
         QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
-
+        
         try:
+            
             intervals = ["1h", "4h", "1D"]
             first_pix = None
-
-            # prepare output folder if saving
             out_dir = self.save_dir_input.text() or "charts"
             if self.save_checkbox.isChecked():
                 os.makedirs(out_dir, exist_ok=True)
 
             for idx, interval in enumerate(intervals):
                 raw_png = fetch_chart_bytes(pair, interval=interval)
-
-                # display only the 1h chart
                 if idx == 0:
                     img = Image.open(io.BytesIO(raw_png)).convert("RGBA")
                     try:
                         first_pix = toqpixmap(img)
                     except Exception:
-                        # fallback via temp file
                         import tempfile
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
                             img.save(tmp, format="PNG")
                             tmp_path = tmp.name
                         first_pix = QPixmap(tmp_path)
                         os.unlink(tmp_path)
-
-                # save each interval if requested
                 if self.save_checkbox.isChecked():
                     fname = f"{pair.replace(':','_')}_{interval}.png"
                     path = os.path.join(out_dir, fname)
                     with open(path, "wb") as f:
                         f.write(raw_png)
+                    self.status_label.setText(f"Status: Saved {interval} chart: {path}")
                     self.log(f"Saved {interval} chart: {path}")
 
-            # update UI with the 1h chart
             if first_pix:
                 self.chart_label.setPixmap(
                     first_pix.scaled(
@@ -177,8 +231,10 @@ class MainWindow(QMainWindow):
                         Qt.SmoothTransformation
                     )
                 )
+                self.status_label.setText(f"Status: Screenshot updated for {pair}")
                 self.log(f"Screenshot updated for {pair} (1h)")
         except Exception as e:
+            self.status_label.setText(f"Status: Error capturing charts: {pair}")
             self.log(f"Error capturing chart: {e}")
         finally:
             QApplication.restoreOverrideCursor()

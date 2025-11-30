@@ -1,9 +1,4 @@
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
-
-const DATA_PATH = path.join(process.cwd(), "src/pages/data");
-const FILE_PATH = path.join(DATA_PATH, "blockchain.json");
 
 export interface BlockData {
     candidate?: string;
@@ -21,13 +16,14 @@ export class Block {
         index: number,
         timestamp: string,
         data: BlockData,
-        previousHash = ""
+        previousHash = "",
+        storedHash?: string // optional hash from Firestore
     ) {
         this.index = index;
         this.timestamp = timestamp;
         this.data = data;
         this.previousHash = previousHash;
-        this.hash = this.calculateHash();
+        this.hash = storedHash || this.calculateHash(); // use stored hash if available
     }
 
     calculateHash(): string {
@@ -47,7 +43,7 @@ export class Blockchain {
     chain: Block[];
 
     constructor() {
-        this.chain = this.loadChain();
+        this.chain = [this.createGenesisBlock()];
     }
 
     createGenesisBlock(): Block {
@@ -62,7 +58,6 @@ export class Blockchain {
         newBlock.previousHash = this.getLatestBlock().hash;
         newBlock.hash = newBlock.calculateHash();
         this.chain.push(newBlock);
-        this.saveChain();
     }
 
     isChainValid(): boolean {
@@ -79,42 +74,6 @@ export class Blockchain {
             }
         }
         return true;
-    }
-
-    countVotes(): Record<string, number> {
-        const votes: Record<string, number> = {};
-        this.chain.forEach((block) => {
-            if (block.data.candidate) {
-                const candidate = block.data.candidate;
-                votes[candidate] = (votes[candidate] || 0) + 1;
-            }
-        });
-        return votes;
-    }
-
-    saveChain(): void {
-        if (!fs.existsSync(DATA_PATH)) {
-            fs.mkdirSync(DATA_PATH);
-        }
-        fs.writeFileSync(FILE_PATH, JSON.stringify(this.chain, null, 2));
-    }
-
-    loadChain(): Block[] {
-        if (fs.existsSync(FILE_PATH)) {
-            const data = fs.readFileSync(FILE_PATH, "utf-8");
-            const parsed = JSON.parse(data);
-            return parsed.map(
-                (block: any) =>
-                    new Block(
-                        block.index,
-                        block.timestamp,
-                        block.data,
-                        block.previousHash
-                    )
-            );
-        } else {
-            return [this.createGenesisBlock()];
-        }
     }
 }
 

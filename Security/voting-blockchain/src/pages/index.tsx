@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { votingBlockchain } from "@/lib/blockchain";
+import { saveVote, getVotesAndChain } from "@/lib/firestore";
 
 type Block = {
   index: number;
@@ -16,6 +18,8 @@ export default function Home() {
   const [chainValid, setChainValid] = useState<boolean>(true);
   const [isVoting, setIsVoting] = useState<boolean>(false);
 
+  const credit = process.env.NEXT_PUBLIC_PROJECT_CREDIT;
+
   const submitVote = async () => {
     if (!candidate.trim()) {
       alert("Please enter a candidate name.");
@@ -23,17 +27,12 @@ export default function Home() {
     }
     setIsVoting(true);
     try {
-      const res = await fetch("/api/vote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidate }),
-      });
-
-      const data = await res.json();
-      setMessage(data.message);
-      fetchVotes();
+      await saveVote(votingBlockchain, candidate);
+      setMessage(`Your vote for "${candidate}" was recorded successfully!`);
       setCandidate("");
+      fetchVotes();
     } catch (error) {
+      console.error(error);
       setMessage("Error submitting vote.");
     } finally {
       setIsVoting(false);
@@ -41,11 +40,14 @@ export default function Home() {
   };
 
   const fetchVotes = async () => {
-    const res = await fetch("/api/vote");
-    const data = await res.json();
-    setVotes(data.votes);
-    setChain(data.chain);
-    setChainValid(data.chainValid);
+    try {
+      const { votes, blockchain } = await getVotesAndChain();
+      setVotes(votes);
+      setChain(blockchain.chain);
+      setChainValid(blockchain.isChainValid());
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   useEffect(() => {
@@ -54,6 +56,17 @@ export default function Home() {
 
   return (
     <div style={styles.container}>
+      <div
+        style={{
+          marginBottom: "16px",
+          color: "#666666",
+          fontSize: "1rem",
+          textAlign: "center",
+        }}
+      >
+        <em>{credit}</em>
+      </div>
+
       <h1 style={styles.title}>Blockchain Voting System</h1>
 
       <div style={styles.inputContainer}>
@@ -69,7 +82,7 @@ export default function Home() {
           disabled={isVoting}
           style={{
             ...styles.button,
-            backgroundColor: isVoting ? "#888" : "#0070f3",
+            backgroundColor: isVoting ? "#888888" : "#0070f3",
             cursor: isVoting ? "not-allowed" : "pointer",
           }}
         >
@@ -81,27 +94,35 @@ export default function Home() {
 
       <h2 style={styles.subtitle}>Current Votes</h2>
       <div style={styles.grid}>
-        {Object.entries(votes).map(([name, count]) => (
-          <div key={name} style={styles.card}>
-            <h3>{name}</h3>
-            <p>
-              {count} vote{count !== 1 ? "s" : ""}
-            </p>
-          </div>
-        ))}
+        {votes && typeof votes === "object" && Object.entries(votes).length > 0 ? (
+          Object.entries(votes).map(([name, count]) => (
+            <div key={name} style={styles.card}>
+              <h3>{name}</h3>
+              <p>
+                {count} vote{count !== 1 ? "s" : ""}
+              </p>
+            </div>
+          ))
+        ) : (
+          <div style={styles.card}>No votes yet.</div>
+        )}
       </div>
 
       <h2 style={styles.subtitle}>Blockchain Data</h2>
       <div style={styles.chain}>
-        {chain.map((block) => (
-          <div key={block.hash} style={styles.block}>
-            <p><strong>Block:</strong> {block.index}</p>
-            <p><strong>Timestamp:</strong> {new Date(Number(block.timestamp)).toLocaleString()}</p>
-            <p><strong>Data:</strong> {block.data.isGenesis ? "Genesis Block" : block.data.candidate}</p>
-            <p><strong>Previous Hash:</strong><br /> {block.previousHash}</p>
-            <p><strong>Hash:</strong><br /> {block.hash}</p>
-          </div>
-        ))}
+        {Array.isArray(chain) && chain.length > 0 ? (
+          chain.map((block) => (
+            <div key={block.hash} style={styles.block}>
+              <p><strong>Block:</strong> {block.index}</p>
+              <p><strong>Timestamp:</strong> {new Date(Number(block.timestamp)).toLocaleString()}</p>
+              <p><strong>Data:</strong> {block.data.isGenesis ? "Genesis Block" : block.data.candidate}</p>
+              <p><strong>Previous Hash:</strong><br /> {block.previousHash}</p>
+              <p><strong>Hash:</strong><br /> {block.hash}</p>
+            </div>
+          ))
+        ) : (
+          <div style={styles.block}>No blocks yet.</div>
+        )}
       </div>
 
       <h3 style={styles.integrity}>
@@ -117,17 +138,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "Arial, sans-serif",
     maxWidth: "1000px",
     margin: "0 auto",
+    backgroundColor: "#ffffff", // fixed background
+    color: "#000000",           // fixed text color
+    colorScheme: "light",       // prevent system theme switching
   },
   title: {
     textAlign: "center",
     fontSize: "2.5rem",
     marginBottom: "20px",
-    color: "#333",
+    color: "#333333",
   },
   subtitle: {
     marginTop: "40px",
     fontSize: "1.8rem",
-    color: "#222",
+    color: "#222222",
   },
   inputContainer: {
     display: "flex",
@@ -138,14 +162,16 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: "10px",
     borderRadius: "8px",
-    border: "1px solid #ccc",
+    border: "1px solid #cccccc",
     fontSize: "1rem",
+    backgroundColor: "#ffffff",
+    color: "#000000",
   },
   button: {
     padding: "10px 20px",
     borderRadius: "8px",
     border: "none",
-    color: "#fff",
+    color: "#ffffff",
     fontWeight: "bold",
     fontSize: "1rem",
     transition: "background-color 0.3s ease",
@@ -163,11 +189,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   card: {
     padding: "20px",
-    border: "1px solid #eee",
+    border: "1px solid #eeeeee",
     borderRadius: "12px",
     boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
     textAlign: "center",
     backgroundColor: "#fafafa",
+    color: "#000000",
   },
   chain: {
     marginTop: "20px",
@@ -177,9 +204,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   block: {
     padding: "20px",
-    border: "1px solid #ddd",
+    border: "1px solid #dddddd",
     borderRadius: "10px",
     backgroundColor: "#f9f9f9",
+    color: "#000000",
     boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
     wordBreak: "break-word",
     fontSize: "0.9rem",
@@ -187,7 +215,7 @@ const styles: Record<string, React.CSSProperties> = {
   integrity: {
     marginTop: "50px",
     fontSize: "1.2rem",
-    color: "#555",
+    color: "#555555",
     textAlign: "center",
   },
 };

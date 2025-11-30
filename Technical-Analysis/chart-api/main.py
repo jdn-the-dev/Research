@@ -10,10 +10,11 @@ if not API_KEY:
     sys.exit(1)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
+TOKEN = "WLD"
 intervals = {
-    "1h": {"symbol": "BINANCE:BTCUSDT", "interval": "1h"},
-    "4h": {"symbol": "BINANCE:BTCUSDT", "interval": "4h"},
-    "1d": {"symbol": "BINANCE:BTCUSDT", "interval": "1D"},
+    "1h": {"symbol": f"BINANCE:{TOKEN}USDT", "interval": "1h"},
+    "4h": {"symbol": f"BINANCE:{TOKEN}USDT", "interval": "4h"},
+    "1d": {"symbol": f"BINANCE:{TOKEN}USDT", "interval": "1D"},
 }
 
 COMMON = {
